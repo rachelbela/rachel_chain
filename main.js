@@ -7,10 +7,31 @@ class Block{
         this.data = data;
         this.previousHash = previousHash;
         this.hash = this.computeHash();
+        this.nonce = 1;
     }
     computeHash(){
-        return sha256(this.previousHash +this.data).toString();
+        return sha256(this.previousHash +this.data + this.nonce).toString();
     }
+    getAnswer(difficulty){
+        let answer = "";
+        for(let i = 0; i < difficulty; i++){
+            answer += "0";
+        }
+        return answer;
+    }
+    // 计算符合区块链难度的hash
+    // 什么是符合区块链难度的hash
+    mine(difficulty){
+        while(true){
+            this.hash = this.computeHash();
+            if(this.hash.substring(0,difficulty) === this.getAnswer(difficulty)){
+                console.log("挖矿成功，hash值为："+this.hash);
+                break;
+            }
+            this.nonce++;
+        }
+    }
+
 }
 
 // 链
@@ -19,6 +40,7 @@ class Block{
 class Chain {
     constructor(){
         this.chain = [this.bigBang()];
+        this.difficulty = 5; // 挖矿难度
     }
 
     bigBang(){
@@ -33,7 +55,8 @@ class Chain {
     addBlockToChain(newBlock){
         // 找到最新一个block的hash
         newBlock.previousHash = this.getLatestBlock().hash;
-        newBlock.hash = newBlock.computeHash();
+        // 挖矿，计算符合区块链难度的hash
+        newBlock.mine(this.difficulty);
         this.chain.push(newBlock);
     }
     // 验证当前的区块链是否合法
@@ -67,18 +90,13 @@ class Chain {
 const chain = new Chain();
 const block1 = new Block('转账10元',"");
 const block2 = new Block('转账十个10元',"");
-const block3 = new Block('转2个10元',"");
-const block4 = new Block('转账3个10元',"");
-const block5 = new Block('转账4个10元',"");
 chain.addBlockToChain(block1);
 chain.addBlockToChain(block2);
-chain.addBlockToChain(block3);
-chain.addBlockToChain(block4);
-chain.addBlockToChain(block5);
-
-// block1.data = '转账100元'; // 篡改数据
 chain.chain[1].data = '转账100元'; // 篡改区块
-chain.chain[1].hash = chain.chain[1].computeHash(); // 重新计算篡改区块的hash值
-chain.chain[2].previousHash = chain.chain[1].hash; // 让后一个区块的previousHash指向篡改区块的hash值
-console.log(chain);
+chain.chain[1].mine(5); // 重新计算篡改区块的hash值
+// chain.chain[2].previousHash = chain.chain[1].hash; // 让后一个区块的previousHash指向篡改区块的hash值
+// console.log(chain);
 console.log(chain.validateChain()); // 验证链是否合法
+
+// console.log(sha256("rachel_1").toString().length)
+// console.log(sha256("rachel_2").toString())
