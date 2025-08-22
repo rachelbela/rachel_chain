@@ -1,10 +1,23 @@
 const sha256 = require('crypto-js/sha256');
-
+const Eclib = require('elliptic').ec;
+const ec = new Eclib('secp256k1');
 class Transaction {
     constructor(from, to, amount) { 
         this.from = from; // 发送方
         this.to = to; // 接收方
         this.amount = amount; // 转账金额
+    }
+
+     computeHash(){
+        return sha256(this.from + this.to + this.amount).toString();
+    }
+    sign(key){
+        this.signature = key.sign(this.computeHash(),"base64").toDER("hex")
+    }
+    isValid(){
+        if(this.from === "") return true; // 如果from为空，说明是矿工奖励交易
+        const publickey = ec.keyFromPublic(this.from, 'hex');
+        return publickey.verify(this.computeHash(), this.signature)
     }
 }
 // data
@@ -32,6 +45,8 @@ class Block{
     // 计算符合区块链难度的hash
     // 什么是符合区块链难度的hash
     mine(difficulty){
+        this.validateBlockTransactions(); // 验证区块中的交易是否合法
+        console.log("开始挖矿，计算符合区块链难度的hash");
         while(true){
             this.hash = this.computeHash();
             if(this.hash.substring(0,difficulty) === this.getAnswer(difficulty)){
@@ -40,6 +55,16 @@ class Block{
             }
             this.nonce++;
         }
+    }
+
+    validateBlockTransactions(){
+        for(let transaction of this.transactions){
+            if(!transaction.isValid()){
+                console.log("invalid transaction found in transactions,发现异常交易");
+                return false
+            }
+        }
+        return true; // 如果所有交易都合法，则返回true
     }
 
 }
@@ -65,8 +90,11 @@ class Chain {
     }
     // 添加transaction到交易池
     addTransactionToPool(transaction){
+        if(!transaction.isValid()){
+            throw Error("invalid transaction");
+        }
+        console.log("transaction is valid");
         this.transactionPool.push(transaction);
-        console.log(`交易已添加到交易池: ${transaction.from} -> ${transaction.to} : ${transaction.amount}`);
     }
 
     addBlockToChain(newBlock){
@@ -100,7 +128,10 @@ class Chain {
         for(let i = 1; i < this.chain.length; i++){
             const currentBlock = this.chain[i];
             const previousBlock = this.chain[i - 1];
-
+            if(!currentBlock.validateBlockTransactions()){
+                console.log(`发现非法交易`);
+                return false; // 如果区块中的交易不合法，则链不合法
+            }
             // 验证当前区块的hash值是否正确
             if(currentBlock.hash !== currentBlock.computeHash()){
                 console.log(`区块被篡改:${i}`);
@@ -119,15 +150,31 @@ class Chain {
 
 // 测试代码
 const rachelCoin = new Chain();
-const transaction1 = new Transaction("Alice", "Bob", 10);
-const transaction2 = new Transaction("Bob", "Charlie", 5);
-rachelCoin.addTransactionToPool(transaction1);
-rachelCoin.addTransactionToPool(transaction2);
 
-console.log(rachelCoin)
-rachelCoin.mineTransactionPool("Miner1"); // 挖矿，打包交易池中的交易
+const keyPairSender = ec.genKeyPair();
+const publicKeySender = keyPairSender.getPublic('hex');
+const privateKeySender = keyPairSender.getPrivate('hex');
+const keyPairReceiver = ec.genKeyPair();
+const publicKeyReceiver = keyPairSender.getPublic('hex');
+const privateKeyReceiver = keyPairSender.getPrivate('hex');
+
+const t1 = new Transaction(publicKeySender, publicKeyReceiver, 10);
+t1.sign(keyPairSender);
+console.log(t1)
+console.log(t1.isValid()); // 验证交易是否合法
+// const transaction2 = new Transaction("Bob", "Charlie", 5);
+// t1.amount = 100; // 篡改交易金额
+rachelCoin.addTransactionToPool(t1);
+rachelCoin.mineTransactionPool(publicKeyReceiver)
 console.log(rachelCoin); // 查看区块链
-console.log(rachelCoin.chain[1]); // 查看新区块中的交易
+console.log(rachelCoin.chain); // 查看新区块中的交易
+console.log(rachelCoin.chain[1].transactions); // 查看新区块中的交易
+// rachelCoin.addTransactionToPool(transaction2);
+
+// console.log(rachelCoin)
+// rachelCoin.mineTransactionPool("Miner1"); // 挖矿，打包交易池中的交易
+// console.log(rachelCoin); // 查看区块链
+// console.log(rachelCoin.chain[1]); // 查看新区块中的交易
 
 // const chain = new Chain();
 // const block1 = new Block('转账10元',"");

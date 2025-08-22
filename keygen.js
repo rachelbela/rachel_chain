@@ -1,12 +1,12 @@
-var EC = require('elliptic').ec;
+const EC = require('elliptic').ec;
 const sha256 = require('crypto-js/sha256');
 
 // Create and initialize EC context
 // (better do it once and reuse it)
-var ec = new EC('secp256k1');
+const ec = new EC('secp256k1');
 
 // Generate keys
-var key = ec.genKeyPair();
+const key = ec.genKeyPair();
 
 console.log(key.getPrivate('hex')); // 私钥
 console.log(key.getPublic('hex')); // 公钥
